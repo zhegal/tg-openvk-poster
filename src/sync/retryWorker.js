@@ -4,8 +4,9 @@ import { errorToString } from '../utils/errors.js';
 import { log } from '../utils/log.js';
 
 export class RetryWorker {
-  constructor({ avatarSync, telegramLogger }) {
+  constructor({ avatarSync, postSync, telegramLogger }) {
     this.avatarSync = avatarSync;
+    this.postSync = postSync;
     this.telegramLogger = telegramLogger;
     this.timer = null;
     this.running = false;
@@ -41,11 +42,13 @@ export class RetryWorker {
     try {
       await this.telegramLogger.info(`Retrying job #${job.id} (${job.type}), attempt ${job.attempts + 1}.`);
 
-      if (job.type !== 'avatar_sync') {
+      if (job.type === 'avatar_sync') {
+        await this.avatarSync.retry(job.payload);
+      } else if (job.type === 'post_text_sync' && this.postSync) {
+        await this.postSync.retry(job.payload);
+      } else {
         throw new Error(`Unsupported retry job type: ${job.type}`);
       }
-
-      await this.avatarSync.retry(job.payload);
       await markRetryDone(job.id);
       await this.telegramLogger.info(`Retry job #${job.id} completed.`);
     } catch (error) {

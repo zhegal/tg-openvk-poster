@@ -5,7 +5,9 @@ import { TelegramClient } from './telegram/client.js';
 import { TelegramLogger } from './telegram/logger.js';
 import { OpenVkClient } from './openvk/client.js';
 import { OpenVkPhotos } from './openvk/photos.js';
+import { OpenVkWall } from './openvk/wall.js';
 import { AvatarSync } from './sync/avatarSync.js';
+import { PostSync } from './sync/postSync.js';
 import { RetryWorker } from './sync/retryWorker.js';
 import { config } from './config.js';
 import { errorToString } from './utils/errors.js';
@@ -15,8 +17,10 @@ const bot = new TelegramClient();
 const telegramLogger = new TelegramLogger(bot);
 const openVkClient = new OpenVkClient();
 const openVkPhotos = new OpenVkPhotos(openVkClient);
+const openVkWall = new OpenVkWall(openVkClient);
 const avatarSync = new AvatarSync({ bot, openVkPhotos, telegramLogger });
-const retryWorker = new RetryWorker({ avatarSync, telegramLogger });
+const postSync = new PostSync({ openVkWall, telegramLogger });
+const retryWorker = new RetryWorker({ avatarSync, postSync, telegramLogger });
 
 async function main() {
   await migrate();
@@ -29,7 +33,8 @@ async function main() {
     try {
       if (updateId && await isUpdateProcessed(updateId)) return;
 
-      const handled = await avatarSync.handleChannelPost(message);
+      const handled = await avatarSync.handleChannelPost(message)
+        || await postSync.handleChannelPost(message);
       if (handled && updateId) {
         await markUpdateProcessed(updateId);
       }

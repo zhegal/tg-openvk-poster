@@ -2,7 +2,10 @@
 
 Minimal Telegram channel to OpenVK public page sync.
 
-Current scope: when Telegram sends a channel avatar change event, the app downloads that avatar and sets it as the OpenVK public page avatar.
+Current scope:
+
+- when Telegram sends a channel avatar change event, the app downloads that avatar and sets it as the OpenVK public page avatar;
+- when a plain text post appears in the Telegram channel, the app publishes the same text to the OpenVK public page wall.
 
 ## Requirements
 
@@ -81,6 +84,14 @@ docker compose down -v
    - `photos.saveOwnerPhoto` with `photo` and `hash`
 5. If OpenVK upload/save fails, it stores a retry job in Postgres and retries after `RETRY_DELAY_MS`.
 
+Text post flow:
+
+1. The app receives a `channel_post` update.
+2. If it contains `text` or `caption`, and is not a service message, it calls `wall.post`.
+3. The post is published to `OPENVK_OWNER_ID` with `from_group=1`.
+4. The app stores `telegram_chat_id + telegram_message_id -> openvk_owner_id + openvk_post_id` in Postgres.
+5. If OpenVK returns an error, it stores a retry job and retries after `RETRY_DELAY_MS`.
+
 ## Verifying Telegram Events
 
 After starting the app:
@@ -95,6 +106,12 @@ Expected log message:
 ```text
 Telegram channel avatar changed. Syncing to OpenVK...
 OpenVK avatar updated for owner_id=-3084.
+```
+
+For a text post, expected log message:
+
+```text
+Telegram post 123 published to OpenVK wall-3084_456.
 ```
 
 If no event arrives, Telegram is not delivering avatar change service messages to the bot in that channel setup. This app intentionally does not poll `getChat` for avatar changes.

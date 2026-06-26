@@ -2,6 +2,7 @@ import { config } from '../config.js';
 import { downloadTelegramFile } from '../telegram/files.js';
 import { enqueueRetry } from '../db/retryRepository.js';
 import { getState, setState } from '../db/stateRepository.js';
+import { isConfiguredChannel } from '../telegram/channel.js';
 import { errorToString } from '../utils/errors.js';
 
 const LAST_AVATAR_UNIQUE_ID = 'last_avatar_unique_id';
@@ -14,7 +15,7 @@ export class AvatarSync {
   }
 
   async handleChannelPost(message) {
-    if (!this.isConfiguredChannel(message.chat)) return false;
+    if (!isConfiguredChannel(message.chat)) return false;
     if (!Array.isArray(message.new_chat_photo) || message.new_chat_photo.length === 0) return false;
 
     const photoSize = message.new_chat_photo[message.new_chat_photo.length - 1];
@@ -53,7 +54,6 @@ export class AvatarSync {
         fileUniqueId: photoSize.file_unique_id,
         ...context,
       }, error);
-      throw error;
     }
   }
 
@@ -71,10 +71,4 @@ export class AvatarSync {
     );
   }
 
-  isConfiguredChannel(chat) {
-    const configured = config.telegram.channelId;
-    const chatId = chat?.id;
-    const username = chat?.username ? `@${chat.username}` : null;
-    return String(chatId) === configured || Number(configured) === chatId || username === configured;
-  }
 }

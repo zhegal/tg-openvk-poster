@@ -28,5 +28,16 @@ export async function migrate() {
     create index if not exists retry_jobs_pending_idx
       on retry_jobs (run_after)
       where status = 'pending';
+
+    create table if not exists post_mappings (
+      telegram_chat_id text not null,
+      telegram_message_id bigint not null,
+      openvk_owner_id integer not null,
+      openvk_post_id bigint not null,
+      text text not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      primary key (telegram_chat_id, telegram_message_id)
+    );
   `);
 }
