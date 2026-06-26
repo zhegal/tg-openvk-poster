@@ -6,6 +6,7 @@ Current scope:
 
 - when Telegram sends a channel avatar change event, the app downloads that avatar and sets it as the OpenVK public page avatar;
 - when a plain text post appears in the Telegram channel, the app publishes the same text to the OpenVK public page wall.
+- when a Telegram text post is a reply to an already synced Telegram post, the app publishes it as an OpenVK repost with a comment.
 
 ## Requirements
 
@@ -91,6 +92,14 @@ Text post flow:
 3. The post is published to `OPENVK_OWNER_ID` with `from_group=1`.
 4. The app stores `telegram_chat_id + telegram_message_id -> openvk_owner_id + openvk_post_id` in Postgres.
 5. If OpenVK returns an error, it stores a retry job and retries after `RETRY_DELAY_MS`.
+
+Reply flow:
+
+1. The app receives a `channel_post` with `reply_to_message`.
+2. It looks up the replied Telegram message in `post_mappings`.
+3. If a mapping exists, it calls `wall.repost` with `object=wall<openvk_owner_id>_<openvk_post_id>` and uses the Telegram reply text as the repost comment.
+4. If no mapping exists, it publishes the Telegram reply as a normal OpenVK wall post.
+5. The new OpenVK post id is stored in `post_mappings`.
 
 ## Verifying Telegram Events
 

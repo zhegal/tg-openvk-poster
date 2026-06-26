@@ -25,6 +25,7 @@ export class PostSync {
     await this.publishTextPost({
       telegramChatId: message.chat.id,
       telegramMessageId: message.message_id,
+      replyToTelegramMessageId: message.reply_to_message?.message_id ?? null,
       text,
       source: 'telegram_event',
     });
@@ -38,7 +39,18 @@ export class PostSync {
 
   async publishTextPost(payload, { scheduleOnFailure = true } = {}) {
     try {
-      const response = await this.openVkWall.publishTextPost(payload.text);
+      const replyTarget = payload.replyToTelegramMessageId
+        ? await findPostMapping(payload.telegramChatId, payload.replyToTelegramMessageId)
+        : null;
+
+      const response = replyTarget
+        ? await this.openVkWall.repostTextPost({
+          text: payload.text,
+          originalOwnerId: replyTarget.openvk_owner_id,
+          originalPostId: replyTarget.openvk_post_id,
+        })
+        : await this.openVkWall.publishTextPost(payload.text);
+
       const openvkPostId = response?.post_id ?? response;
 
       await savePostMapping({
@@ -50,7 +62,9 @@ export class PostSync {
       });
 
       await this.telegramLogger.info(
-        `Telegram post ${payload.telegramMessageId} published to OpenVK wall${config.openvk.ownerId}_${openvkPostId}.`,
+        replyTarget
+          ? `Telegram reply ${payload.telegramMessageId} reposted OpenVK wall${replyTarget.openvk_owner_id}_${replyTarget.openvk_post_id} to wall${config.openvk.ownerId}_${openvkPostId}.`
+          : `Telegram post ${payload.telegramMessageId} published to OpenVK wall${config.openvk.ownerId}_${openvkPostId}.`,
       );
     } catch (error) {
       if (scheduleOnFailure) {
