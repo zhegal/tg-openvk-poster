@@ -31,6 +31,18 @@ export async function savePostMapping({ telegramChatId, telegramMessageId, openv
         text = excluded.text,
         updated_at = now()
     `,
-    [String(telegramChatId), telegramMessageId, openvkOwnerId, openvkPostId, text],
+    [String(telegramChatId), telegramMessageId, openvkOwnerId, openvkPostId, text ?? null],
   );
+}
+
+export async function savePostMappings({ telegramChatId, telegramMessageIds, openvkOwnerId, openvkPostId, text }) {
+  for (const telegramMessageId of telegramMessageIds) {
+    await savePostMapping({
+      telegramChatId,
+      telegramMessageId,
+      openvkOwnerId,
+      openvkPostId,
+      text,
+    });
+  }
 }

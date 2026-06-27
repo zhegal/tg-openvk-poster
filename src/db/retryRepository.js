@@ -38,3 +38,37 @@ export async function rescheduleRetry(id, attempts, runAfter, error) {
     [id, attempts, runAfter, error],
   );
 }
+
+export async function cancelPendingRetriesForTelegramMessages(type, telegramChatId, telegramMessageIds) {
+  const result = await pool.query(
+    `
+      select id, payload
+      from retry_jobs
+      where type = $1
+        and status = 'pending'
+        and payload->>'telegramChatId' = $2
+    `,
+    [type, String(telegramChatId)],
+  );
+
+  const targetIds = new Set(telegramMessageIds.map(String));
+  const retryIds = result.rows
+    .filter((row) => {
+      const payloadIds = row.payload.telegramMessageIds ?? [row.payload.telegramMessageId];
+      return payloadIds.some((id) => targetIds.has(String(id)));
+    })
+    .map((row) => row.id);
+
+  if (retryIds.length === 0) return;
+
+  await pool.query(
+    `
+      update retry_jobs
+      set status = 'cancelled',
+          updated_at = now(),
+          last_error = coalesce(last_error, 'Cancelled after mapping was saved')
+      where id = any($1::bigint[])
+    `,
+    [retryIds],
+  );
+}

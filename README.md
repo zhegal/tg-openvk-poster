@@ -5,7 +5,8 @@ Minimal Telegram channel to OpenVK public page sync.
 Current scope:
 
 - when Telegram sends a channel avatar change event, the app downloads that avatar and sets it as the OpenVK public page avatar;
-- when a plain text post appears in the Telegram channel, the app publishes the same text to the OpenVK public page wall.
+- when a text or photo post appears in the Telegram channel, the app publishes it to the OpenVK public page wall;
+- Telegram photo albums are collected briefly and published as one OpenVK post with multiple photo attachments;
 - when a Telegram text post is a reply to an already synced Telegram post, the app publishes it as an OpenVK repost with a comment.
 
 ## Requirements
@@ -37,6 +38,7 @@ OPENVK_OWNER_ID=-3084
 
 DATABASE_URL=postgres://openvk_sync:openvk_sync@postgres:5432/openvk_sync
 RETRY_DELAY_MS=3600000
+MEDIA_GROUP_SETTLE_MS=2500
 LOG_LEVEL=info
 ```
 
@@ -74,6 +76,13 @@ Remove database data:
 docker compose down -v
 ```
 
+Cancel all pending post retries, useful after manually confirming that old failed image-only posts were already published:
+
+```bash
+docker compose exec postgres psql -U openvk_sync -d openvk_sync \
+  -c "update retry_jobs set status = 'cancelled', updated_at = now() where status = 'pending' and type in ('post_sync', 'post_text_sync');"
+```
+
 ## How It Works
 
 1. The app uses Telegram long polling.
@@ -85,19 +94,28 @@ docker compose down -v
    - `photos.saveOwnerPhoto` with `photo` and `hash`
 5. If OpenVK upload/save fails, it stores a retry job in Postgres and retries after `RETRY_DELAY_MS`.
 
-Text post flow:
+Post flow:
 
 1. The app receives a `channel_post` update.
-2. If it contains `text` or `caption`, and is not a service message, it calls `wall.post`.
-3. The post is published to `OPENVK_OWNER_ID` with `from_group=1`.
+2. If it contains `text`, `caption`, or `photo`, and is not a service message, it prepares an OpenVK wall post.
+3. Photo files are downloaded from Telegram, uploaded through `photos.getWallUploadServer`, and saved through `photos.saveWallPhoto`.
+4. The post is published to `OPENVK_OWNER_ID` with `from_group=1` and photo attachments when present.
+5. The app stores `telegram_chat_id + telegram_message_id -> openvk_owner_id + openvk_post_id` in Postgres.
+6. If OpenVK returns an error, it stores a retry job and retries after `RETRY_DELAY_MS`.
+
+Telegram media group flow:
+
+1. Telegram sends albums as multiple `channel_post` updates with the same `media_group_id`.
+2. The app waits `MEDIA_GROUP_SETTLE_MS` after the latest item.
+3. It publishes the collected photos as one OpenVK post.
 4. The app stores `telegram_chat_id + telegram_message_id -> openvk_owner_id + openvk_post_id` in Postgres.
-5. If OpenVK returns an error, it stores a retry job and retries after `RETRY_DELAY_MS`.
+   Every Telegram message id from the album maps to the same OpenVK post id.
 
 Reply flow:
 
 1. The app receives a `channel_post` with `reply_to_message`.
 2. It looks up the replied Telegram message in `post_mappings`.
-3. If a mapping exists, it calls `wall.repost` with `object=wall<openvk_owner_id>_<openvk_post_id>` and uses the Telegram reply text as the repost comment.
+3. If a mapping exists, it calls `wall.repost` with `object=wall<openvk_owner_id>_<openvk_post_id>` and uses the Telegram reply text/caption and photos as the repost comment/attachments.
 4. If no mapping exists, it publishes the Telegram reply as a normal OpenVK wall post.
 5. The new OpenVK post id is stored in `post_mappings`.
 

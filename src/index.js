@@ -19,7 +19,7 @@ const openVkClient = new OpenVkClient();
 const openVkPhotos = new OpenVkPhotos(openVkClient);
 const openVkWall = new OpenVkWall(openVkClient);
 const avatarSync = new AvatarSync({ bot, openVkPhotos, telegramLogger });
-const postSync = new PostSync({ openVkWall, telegramLogger });
+const postSync = new PostSync({ bot, openVkPhotos, openVkWall, telegramLogger });
 const retryWorker = new RetryWorker({ avatarSync, postSync, telegramLogger });
 
 async function main() {

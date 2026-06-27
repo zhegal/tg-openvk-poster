@@ -44,7 +44,7 @@ export class RetryWorker {
 
       if (job.type === 'avatar_sync') {
         await this.avatarSync.retry(job.payload);
-      } else if (job.type === 'post_text_sync' && this.postSync) {
+      } else if ((job.type === 'post_sync' || job.type === 'post_text_sync') && this.postSync) {
         await this.postSync.retry(job.payload);
       } else {
         throw new Error(`Unsupported retry job type: ${job.type}`);

@@ -34,10 +34,13 @@ export async function migrate() {
       telegram_message_id bigint not null,
       openvk_owner_id integer not null,
       openvk_post_id bigint not null,
-      text text not null,
+      text text,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now(),
       primary key (telegram_chat_id, telegram_message_id)
     );
+
+    alter table post_mappings
+      alter column text drop not null;
   `);
 }

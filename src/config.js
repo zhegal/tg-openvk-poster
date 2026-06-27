@@ -37,5 +37,6 @@ export const config = {
   },
   databaseUrl: required('DATABASE_URL'),
   retryDelayMs: numberVar('RETRY_DELAY_MS', 60 * 60 * 1000),
+  mediaGroupSettleMs: numberVar('MEDIA_GROUP_SETTLE_MS', 2500),
   logLevel: optional('LOG_LEVEL', 'info'),
 };
