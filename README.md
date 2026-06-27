@@ -1,4 +1,4 @@
-# openvk-lk-sync
+# TG OpenVK Poster
 
 Minimal Telegram channel to OpenVK public page sync.
 
